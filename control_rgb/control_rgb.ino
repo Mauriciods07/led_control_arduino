@@ -4,30 +4,10 @@
 #include <string>
 
 #include "config.h"
-
-const int PIN_BRIGHT = 15;
-const int PIN_RED = 14;
-const int PIN_GREEN = 12;
-const int PIN_BLUE = 13;
+#include "utils.hpp"
+#include "parameters.hpp"
 
 ESP8266WebServer server(80);
-
-// handler variables
-bool ON = false;
-int pattern = 0;
-int len_pattern_list = 0;
-String jsonString;
-
-int step = 0;
-int brightness = 0;
-bool ascending = true;
-bool done_pattern = true;
-
-// pattern variables
-int global_red = 0;
-int global_green = 0;
-int global_blue = 0;
-int global_delay = 0;
 
 ////// HANDLERS
 void getStatus() {
@@ -96,7 +76,6 @@ void handleNotFound() {
   server.send(404, "application/json", "Not found");
 }
 
-///// SETUP
 void setup() {
   pinMode(PIN_RED, OUTPUT);
   pinMode(PIN_GREEN, OUTPUT);
@@ -111,25 +90,9 @@ void setup() {
   digitalWrite(2,LOW);
 
   changeLED(0, 0, 0, 0);
-  
-  Serial.println();
-  Serial.println();
-  Serial.print("Conectandose a la red: ");
-  Serial.println(ssid);
 
-  WiFi.begin(ssid, password);
+  connectServer();
 
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("");
-  Serial.println("Conexion establecida");
-
-  Serial.println("IP del servicio: ");
-  Serial.println(WiFi.localIP());
-
-  // endpoints
   server.on("/info", HTTP_GET, getStatus);
   server.on("/staticLight", HTTP_GET, turnLightOn);
   server.on("/turnOff", HTTP_GET, turnOff);
@@ -242,7 +205,7 @@ void adjustBrightness() {
     brightness = 0;
     done_pattern = true;
   }
-  print("Brightness: ", brightness);
+  print("Brightness: ", String(brightness));
   delay(10);
 }
 
@@ -253,18 +216,11 @@ void changeLED(int red, int green, int blue, int bright) {
   analogWrite(PIN_BRIGHT, bright);
 }
 
-int getColor(int color) {
-  return 255 - color;
-}
+int getIntParameters(String param) {
+  const char* req_param = server.arg(String(param)).c_str();
+  int int_param = atoi(req_param);
 
-int len(JsonArray jsonArray) {
-  int count = 0;
-
-  for (JsonVariant item: jsonArray) {
-    count += 1;
-  }
-
-  return count;
+  return int_param;
 }
 
 void setVariables(bool onValue) {
@@ -273,16 +229,4 @@ void setVariables(bool onValue) {
   ascending = true;
   brightness = 0;
   step = 0;
-}
-
-int getIntParameters(String param) {
-  const char* req_param = server.arg(String(param)).c_str();
-  int int_param = atoi(req_param);
-
-  return int_param;
-}
-
-void print(String text, String param) {
-  Serial.print(text);
-  Serial.println(param);
 }
