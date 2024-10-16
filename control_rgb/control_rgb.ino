@@ -107,18 +107,15 @@ void loop() {
   server.handleClient();
 
   if (ON && len_pattern_list != 0) {
-    Serial.println("ENTER CONDITION PATTERN");
     changeLEDPattern();
-    delay(10);
   }
 
-  delay(10);
+  delay(global_delay / 2);
 }
 
 ///// PROGRAM LOGIC
 void changeLEDPattern() {
   if (done_pattern) {
-    Serial.println("DONE PATTERN");
     getPatternParams();
     delay(10);
   }
@@ -126,7 +123,7 @@ void changeLEDPattern() {
   if (pattern == 1) {     // breath effect
     Serial.println("PATTERN == 1");
     adjustBrightness();
-    delay(10);
+    delay(global_delay / 2);
   }
 
   changeLED(global_red, global_green, global_blue, brightness);
@@ -154,26 +151,26 @@ void getPatternParams() {
 
   for (JsonVariant item_step: pattern_list) {
     if (local_counter == step) {
-      Serial.print(local_counter);
-      Serial.print(" = ");
-      Serial.println(step);
-
       global_red = item_step["red"];
       global_green = item_step["green"];
       global_blue = item_step["blue"];
-      global_delay = item_step["delay"];
       pattern = item_step["pattern"];
+      
+      transition_in_delay = limit((((float) N)/ (float) item_step["transition_in_delay"]) * global_delay);
+      static_delay = limit((((float) N)/ (float) item_step["static_delay"]) * global_delay);
+      transition_off_delay = limit((((float) N)/ (float) item_step["transition_off_delay"]) * global_delay);
     }
     local_counter += 1;
   }
 
   print("Red: ", String(global_red));
-  print(", Green: ", String(global_green));
-  print(", Blue: ", String(global_blue));
-  print(", Delay: ", String(global_delay));
-  print(", Pattern: ", String(pattern));
+  print("Green: ", String(global_green));
+  print("Blue: ", String(global_blue));
+  print("Pattern: ", String(pattern));
+  print("Transition in delay: ", String(transition_in_delay));
+  print("Static delay: ", String(static_delay));
+  print("Transition off delay: ", String(transition_off_delay));
   delay(10);
-
 
   step += 1;
   if (step >= len_pattern_list) {
@@ -184,6 +181,7 @@ void getPatternParams() {
 
   done_pattern = false;
   ascending = true;
+  done_delay = false;
   Serial.println("DONE PATTERN == FALSE");
 }
 
@@ -191,22 +189,29 @@ void adjustBrightness() {
   if (brightness >= 255) {
     ascending = false;
   }
-  delay(10);
 
   if (ascending) {
-    brightness += 5;
+    brightness += transition_in_delay;
     return;
   }
-  delay(10);
 
-  brightness -= 5;
+  sum_delay += static_delay;
+  if (sum_delay > 255) {
+    sum_delay = 0;
+    done_delay = true;
+  }
+
+  if (!done_delay) {
+    return;
+  }
+
+  brightness -= transition_off_delay;
 
   if (brightness <= 0) {
     brightness = 0;
     done_pattern = true;
   }
   print("Brightness: ", String(brightness));
-  delay(10);
 }
 
 void changeLED(int red, int green, int blue, int bright) {
@@ -223,10 +228,27 @@ int getIntParameters(String param) {
   return int_param;
 }
 
+int limit(int value) {
+  if (value > 255) {
+    return 255;
+  }
+
+  if (value < 0) {
+    return 0;
+  }
+
+  return value;
+}
+
 void setVariables(bool onValue) {
   ON = onValue;
   done_pattern = true;
   ascending = true;
   brightness = 0;
   step = 0;
+  static_delay = 0;
+  transition_in_delay = 0;
+  transition_off_delay = 0;
+  sum_delay = 0;
+  done_delay = false;
 }
